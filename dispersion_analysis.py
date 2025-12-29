@@ -3,6 +3,9 @@ import pandas as pd
 import requests_cache
 from retry_requests import retry
 from date_range import past_date_input
+import streamlit as st
+
+st.title("Meteo Data Fetcher")
 
 # Setup the Open-Meteo API client with cache and retry on error
 cache_session = requests_cache.CachedSession('.cache', expire_after = 3600)
