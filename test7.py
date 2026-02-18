@@ -16,106 +16,149 @@ current_date = date.today()
 
 st.title("Meteo Data to CSV")
 
+def coords():
+
+    if "latitude" not in st.session_state:
+        st.session_state.latitude = default_launch_latitude
+    if "longitude" not in st.session_state:
+        st.session_state.longitude = default_launch_longitude
 
 
-if "latitude" not in st.session_state:
-    st.session_state.latitude = default_launch_latitude
-if "longitude" not in st.session_state:
-    st.session_state.longitude = default_launch_longitude
+    # Reset button
+    if st.button("Reset Coords"):
+        st.session_state.latitude = default_launch_latitude
+        st.session_state.longitude = default_launch_longitude
+        st.rerun()
 
 
-# Reset button
-if st.button("Reset to Default"):
-    st.session_state.latitude = default_launch_latitude
-    st.session_state.longitude = default_launch_longitude
-    st.rerun()
+    # Two columns for neat layout
+    col1, col2 = st.columns(2)
+    with col1:
+        st.number_input(
+            "Enter latitude",
+            min_value=-90.0,
+            max_value=90.0,
+            key="latitude",   # <-- directly bound to session_state
+            format="%.6f"
+        )
+    with col2:
+        st.number_input(
+            "Enter longitude",
+            min_value=-180.0,
+            max_value=180.0,
+            key="longitude",  # <-- directly bound to session_state
+            format="%.6f"
+        )
 
 
-# Two columns for neat layout
-col1, col2 = st.columns(2)
-with col1:
-    st.number_input(
-        "Enter latitude",
-        min_value=-90.0,
-        max_value=90.0,
-        key="latitude",   # <-- directly bound to session_state
-        format="%.6f"
+
+
+
+
+
+
+
+
+# def function1():
+
+#     st.date_input
+#     pass 
+
+
+
+
+
+
+
+
+
+
+def helperfunc(strt_curr, end_curr):
+    if -90 <= end_curr <= 16:
+        print("valid1")
+    elif -91 <= strt_curr <= 16:
+        print("valid2")
+    else:
+        pass
+
+    print(strt_curr)
+    print(end_curr)
+
+
+
+
+
+
+def date():
+
+    date_input = st.date_input("Select date range", [])
+    
+    if isinstance(date_input, tuple) and len(date_input) == 2:
+
+        start_date, end_date = date_input
+        print("This is the start date before end date chosen ", start_date)
+        start_current_days = start_date-current_date
+        end_current_days = end_date-current_date
+
+        if (start_current_days.days == -91) & (end_current_days.days == -91):
+            st.error("Invalid end date")
+        
+        else:     
+            helperfunc(start_current_days.days,end_current_days.days)
+
+    elif isinstance(date_input, tuple) and len(date_input) == 1:
+        start_date = date_input[0]
+        end_date = None
+
+    else:
+        start_date = end_date = None
+        # st.info("Please select both a start and end date.")
+
+
+
+
+
+
+
+def new_func():
+    if 'dates' not in st.session_state:
+        st.session_state.dates = []
+
+    def add_new_date():
+        """Callback function to append a date to the session state list."""
+        st.session_state.dates.append(st.session_state.new_date)
+
+    # 2. Display the current date inputs
+    if st.session_state.dates:
+        for i, user_date in enumerate(st.session_state.dates):
+            st.write(f"Date {i+1}: {user_date}")
+    else:
+        pass
+
+    new_date_value = st.date_input(
+        "Select a date to add", [], key="new_date"
     )
-with col2:
-    st.number_input(
-        "Enter longitude",
-        min_value=-180.0,
-        max_value=180.0,
-        key="longitude",  # <-- directly bound to session_state
-        format="%.6f"
+
+    st.button(
+        "Add Date", 
+        on_click=add_new_date
     )
 
-
-
-# Display current values
-# st.write(f"**Current Latitude:** {st.session_state.latitude}")
-# st.write(f"**Current Longitude:** {st.session_state.longitude}")
-
-# st.balloons()
-
-# st.subheader("Can you see this?")
-# # st.text("Wb this")
-# # st.
-
-# col3, col4 = st.columns(2)
-# with col3:
-#     st.button("Past", key="past_key")
-# with col4:
-#     st.button("Future", key="future_key")
+coords()
+date()
+new_func()
 
 
 
 
-# start_date, end_date = st.date_input("Select date range", [])
-
-date_input = st.date_input("Select date range", [])
-
-# Safely handle any case
-if isinstance(date_input, tuple) and len(date_input) == 2:
-    start_date, end_date = date_input
-    start_current_days = start_date-current_date
-    end_current_days = end_date-current_date
-    # st.write(f"✅ Selected range: {start_date} → {end_date}")
-
-elif isinstance(date_input, tuple) and len(date_input) == 1:
-    start_date = date_input[0]
-    end_date = None
-    st.warning("Please select an end date.")
-else:
-    start_date = end_date = None
-    st.info("Please select both a start and end date.")
 
 
 # st.write(f"Dates selected: {start_date} to {end_date}")
 
-print()
-print()
-print()
-
-try:
-    
-
-    print(start_date, type(start_date))
-    print(end_date, type(end_date))
-    print(current_date, type(current_date))
-
-    print(start_current_days, type(start_current_days))
-except:
 
 # print(f"Num of days:{start_current_days.days}", type(start_current_days.days))
 
 # # print(st.)
-# if -90 <= end_current_days.days <= 16:
-#     print("valid1")
-# elif -91 <= start_current_days.days <= 16:
-#     print("valid2")
-# else:
-#     pass
 
 
 
