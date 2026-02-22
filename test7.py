@@ -85,10 +85,6 @@ def helperfunc(strt_curr, end_curr):
     print(end_curr)
 
 
-
-
-
-
 def date():
 
     date_input = st.date_input("Select date range", [])
@@ -115,11 +111,6 @@ def date():
         # st.info("Please select both a start and end date.")
 
 
-
-
-
-
-
 def new_func():
     if 'dates' not in st.session_state:
         st.session_state.dates = []
@@ -135,9 +126,11 @@ def new_func():
     else:
         pass
 
-    new_date_value = st.date_input(
-        "Select a date to add", [], key="new_date"
-    )
+    date()
+
+    # new_date_value = st.date_input(
+    #     "Select a date to add", [], key="new_date"
+    # )
 
     st.button(
         "Add Date", 
@@ -145,7 +138,7 @@ def new_func():
     )
 
 coords()
-date()
+# date()
 new_func()
 
 
