@@ -76,7 +76,9 @@ for i in date_ranges:
 	start_date = i[0]
 	end_date = i[1]
 
-	# url = "https://api.open-meteo.com/v1/forecast"
+	url = "https://api.open-meteo.com/v1/forecast"
+	url = "https://archive-api.open-meteo.com/v1/archive"
+
 	url = "https://historical-forecast-api.open-meteo.com/v1/forecast"
 
 

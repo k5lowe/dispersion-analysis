@@ -2,7 +2,7 @@
 from open_meteo_client import get_client
 from open_meteo_parse import hourly_to_df, daily_to_df
 
-ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
+ARCHIVE_URL = "https://historical-forecast-api.open-meteo.com/v1/forecast"
 
 def fetch_historical(lat, lon, start_date, end_date, hourly_vars, daily_vars=None, extra_params=None):
     daily_vars = daily_vars or []
