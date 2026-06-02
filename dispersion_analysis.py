@@ -160,6 +160,7 @@ for i in date_ranges:
 		inclusive = "left"
 	)}
 
+	
 	hourly_data["temperature_2m"] = hourly_temperature_2m
 	hourly_data["wind_speed_30hPa"] = hourly_wind_speed_30hPa
 	hourly_data["wind_speed_50hPa"] = hourly_wind_speed_50hPa

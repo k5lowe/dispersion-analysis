@@ -3,9 +3,11 @@ from datetime import date, timedelta
 from weather_router import run_many
 import re
 import pandas as pd
+import numpy as np
 from io import BytesIO
 import zipfile
 import config
+from datetime import time
 
 
 
@@ -32,9 +34,6 @@ if wind_speed_unit:
 
 
 
-
-
-
 def sanitize_filename(name: str) -> str:
     """
     Keep filenames safe across OS:
@@ -47,6 +46,9 @@ def sanitize_filename(name: str) -> str:
 
 def ensure_sorted_hourly(df: pd.DataFrame):
     tcol = "time" if "time" in df.columns else ("date" if "date" in df.columns else None)
+    # df[tcol] = df[tcol].dt.strftime("%Y-%m-%d %H:%M")
+    # df[tcol] = pd.to_datetime(df[tcol])
+    # df[tcol] = df[tcol].dt.strftime("%Y-%m-%d %H:%M")
     if tcol is None:
         raise KeyError(f"Hourly df missing time column. Columns: {list(df.columns)}")
 
@@ -54,6 +56,7 @@ def ensure_sorted_hourly(df: pd.DataFrame):
     out[tcol] = pd.to_datetime(out[tcol], utc=True, errors="coerce")
     out = out.dropna(subset=[tcol]).sort_values(tcol).reset_index(drop=True)
     return out, tcol
+
 
 def make_filtered_sorted(df_hourly: pd.DataFrame) -> pd.DataFrame:
     """
@@ -63,22 +66,25 @@ def make_filtered_sorted(df_hourly: pd.DataFrame) -> pd.DataFrame:
       - cloud_cover_low < 50
     And returns sorted output.
     """
+
     df, tcol = ensure_sorted_hourly(df_hourly)
 
-
-    # Required columns check (helps you get clearer errors)
     required = ["is_day", "cloud_cover_low", tcol]
     missing = [c for c in required if c not in df.columns]
+
     if missing:
-        raise KeyError(f"Missing required columns for filtering: {missing}. Have: {list(df.columns)}")
+        raise KeyError(
+            f"Missing required columns for filtering: {missing}. "
+            f"Have: {list(df.columns)}"
+        )
 
-    # hour filter
-    hours = df[tcol].dt.hour
-    df = df[df["is_day"] == 1]
-    df = df[(hours >= 8) & (hours < 19)]
-    df = df[df["cloud_cover_low"] < 50]
+    df = df[
+        (df["is_day"] == 1) &
+        (df["cloud_cover_low"] < 50) &
+        (df[tcol].dt.hour >= 8) &
+        (df[tcol].dt.hour <= 19)
+    ]
 
-    # already sorted by ensure_sorted_hourly
     return df.reset_index(drop=True)
 
 
@@ -147,7 +153,7 @@ def format_query(item: dict) -> str:
     mode = item.get("mode", "unknown")
     ranges = item.get("ranges", [])
     parts = [f"{kind}: {s.isoformat()} → {e.isoformat()}" for kind, s, e in ranges]
-    return f"{mode} | " + " | ".join(parts)
+    return parts
 
 
 # ----------------------------
@@ -181,9 +187,8 @@ def date_ui(today: date):
     colA, colB = st.columns([0.25, 0.75])
     with colA:
         if st.button("Add Date", disabled=(st.session_state.current_decision is None)):
-            qnum = len(st.session_state.saved_queries) + 1
             decision = dict(st.session_state.current_decision)  # copy
-            decision["label"] = f"query_{qnum:02d}"             # default name per query
+            decision["label"] = f""             # default name per query
             st.session_state.saved_queries.append(decision)
             st.rerun()
 
@@ -204,7 +209,7 @@ def date_ui(today: date):
                 # per-query filename label
                 key = f"label_{i}"
                 default_val = item.get("label", f"query_{i+1:02d}")
-                new_label = st.text_input("File label", value=default_val, key=key)
+                new_label = st.text_input("File name", value=default_val, key=key)
                 item["label"] = sanitize_filename(new_label)  # keep it safe
 
             with right:
@@ -226,7 +231,7 @@ st.divider()
 
 
 st.subheader("Export settings")
-base_name_raw = st.text_input("Output file name (no extension)", value="meteo_export")
+base_name_raw = st.text_input("Output file name", value="")
 base_name = sanitize_filename(base_name_raw)
 
 
@@ -249,6 +254,9 @@ if st.button("Fetch weather"):
                 daily_vars=DAILY_VARS,
                 extra_params=EXTRA_PARAMS,
             )
+
+            # print("res is this: \n", res)
+            # print("this is res type \n", type(res))
         except Exception as e:
             st.error(f"Open-Meteo request failed: {e}")
             st.stop()
@@ -258,6 +266,11 @@ if st.button("Fetch weather"):
         st.stop()
 
     hourly_all = res["hourly"].copy()
+
+    print("THIS IS hourly_all\n ", hourly_all)
+    print("THIS IS TYPE OF hourly_all\n ", type(hourly_all))
+    # print(len(hourly_all))
+
     if "query_id" not in hourly_all.columns:
         st.error("Expected 'query_id' column in hourly output. Check weather_router.run_many().")
         st.stop()
@@ -270,42 +283,121 @@ if st.button("Fetch weather"):
 
             df_q = hourly_all[hourly_all["query_id"] == qid].copy()
             df_q, tcol = ensure_sorted_hourly(df_q)
-
+            
             # FULL
+
+            time_key = ""
+            if "time" in df_q.columns:
+                time_key = "time"
+            elif "date" in df_q.columns:
+                time_key = "date"
+
+            df_q["date"] = df_q[time_key].dt.strftime("%Y-%m-%d %H:%M")
+
             zf.writestr(
-                f"{base_name}_{label}_full-data.csv",
+                f"{label}_full-data.csv",
                 df_q.to_csv(index=False)
             )
 
             # FILTERED
             filtered = make_filtered_sorted(df_q)
 
-            FILTERED_COLS = [
-                tcol,
-                "temperature_2m",
-                "cloud_cover_low",
-                "cloud_cover_mid",
-                "cloud_cover_high",
-                "pressure_msl",
-                "surface_pressure",
-                "is_day",
-                "source",
-                "query_id",
+            filtered = filtered[
+
+                (filtered[tcol].dt.time >= time(8, 0)) &
+                (filtered[tcol].dt.time <= time(19, 0)) &
+                (filtered["cloud_cover_low"] < 50) &
+                (filtered["is_day"] == 1)
             ]
-            FILTERED_COLS = [c for c in FILTERED_COLS if c in filtered.columns]
-            filtered_out = filtered[FILTERED_COLS] if FILTERED_COLS else filtered
+            
+            del filtered["query_id"]
+            del filtered["source"]
+            del filtered["is_day"]
+
 
             zf.writestr(
-                f"{base_name}_{label}.csv",
-                filtered_out.to_csv(index=False)
+                f"{label}_filtered-data.csv",
+                filtered.to_csv(index=False)
             )
+
+            # SIM_PARAMETER_FULL_DATA
+
+            last_sim_parameters = None
+            last_sim_parameters_filtered = None
+            hourly_vars = config.HOURLY_VARS
+            altitudes = config.ALTITUDES
+            wind_speeds = config.WIND_SPEEDS
+            wind_directions = config.WIND_DIRECTIONS
+
+            df_q2 = pd.DataFrame()
+
+            time_key = ""
+            if "time" in df_q.columns:
+                time_key = "time"
+            elif "date" in df_q.columns:
+                time_key = "date"
+
+            df_q2["date"] = df_q[time_key].dt.strftime("%Y-%m-%d %H:%M")
+            df_q2["temperature"] = df_q[hourly_vars[hourly_vars.index("temperature_2m")]]
+            df_q2["pressure"] = df_q[hourly_vars[hourly_vars.index("pressure_msl")]]
+
+            
+            csv_size = len(df_q[time_key])
+
+            for altitude, wind_speed, wind_direction in zip(altitudes, wind_speeds, wind_directions):
+                # print("This is altitude, windspeed, winddirection")
+                # print(altitude, wind_speed, wind_direction)
+                df_q2[f"{altitude}"] = df_q[wind_speed]
+                df_q2[f"stdev [{altitude}]"] = np.zeros(csv_size)
+                df_q2[f"direction [{altitude}]"] = df_q[wind_direction]
+            
+            df_q2["cloud_cover_low"] = df_q["cloud_cover_low"]
+            df_q2["is_day"] = df_q["is_day"]
+
+
+            zf.writestr(
+                f"sim_parameters_{label}_full-data.csv",
+                df_q2.to_csv(index=False)
+            )
+
+
+            # SIM_PARAMETER_FULL_DATA_FILTERED
+
+
+            sim_filtered = make_filtered_sorted(df_q2)
+
+            sim_filtered = sim_filtered[
+
+                (sim_filtered["date"].dt.time >= time(8, 0)) &
+                (sim_filtered["date"].dt.time <= time(19, 0)) &
+                (sim_filtered["cloud_cover_low"] < 50) &
+                (sim_filtered["is_day"] == 1)
+            ]
+            
+
+            zf.writestr(
+                f"sim_parameters_{label}_filtered-data.csv",
+                sim_filtered.to_csv(index=False)
+            )
+
+
+            last_sim_parameters = df_q2.copy()
+            last_sim_parameters_filtered = sim_filtered.copy()
+
+            last_sim_parameters_filtered["date"] = (
+                last_sim_parameters_filtered["date"]
+                .dt.tz_localize(None)
+                .dt.strftime("%Y-%m-%d %H:%M")
+            )
+
+           
 
     zip_buffer.seek(0)
 
     st.download_button(
         "Download all files (ZIP)",
         data=zip_buffer.getvalue(),
-        file_name=f"{base_name}_exports.zip",
+        file_name=f"{base_name}.zip",
         mime="application/zip",
     )
 
@@ -314,7 +406,26 @@ if st.button("Fetch weather"):
     preview_q = hourly_all[hourly_all["query_id"] == last_qid].copy()
     preview_q, _ = ensure_sorted_hourly(preview_q)
     preview_filtered = make_filtered_sorted(preview_q)
-    st.dataframe(preview_filtered.head(200), use_container_width=True)
+
+
+    st.dataframe(
+        preview_filtered.head(200), 
+        use_container_width=True
+    )
+
+
+    st.subheader("Sim Parameters Preview (last query)")
+    st.dataframe(
+        last_sim_parameters.head(200),
+        use_container_width=True
+    )
+
+    st.subheader("Sim Parameters Filtered Preview (last query)")
+    st.dataframe(
+        last_sim_parameters_filtered.head(200),
+        use_container_width=True
+    )
+
 
     if "daily" in res and res["daily"] is not None and len(res["daily"]) > 0:
         st.subheader("Daily (preview)")
