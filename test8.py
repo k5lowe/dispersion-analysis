@@ -23,6 +23,14 @@ unit_label = st.selectbox(
     options=["Default (km/h)", "kn", "ms", "mph"],
     index=0,
 )
+
+
+agree = st.checkbox("Do you agree to the terms?")
+
+if agree:
+    st.write("Great! Proceeding to the next step.")
+
+
 wind_speed_unit = "" if unit_label == "Default (km/h)" else unit_label
 
 
@@ -105,9 +113,9 @@ def coords():
 
     col1, col2 = st.columns(2)
     with col1:
-        st.number_input("Enter latitude", -90.0, 90.0, key="latitude", format="%.6f")
+        st.number_input("Latitude", -90.0, 90.0, key="latitude", format="%.6f")
     with col2:
-        st.number_input("Enter longitude", -180.0, 180.0, key="longitude", format="%.6f")
+        st.number_input("Longitude", -180.0, 180.0, key="longitude", format="%.6f")
 
 
 # ----------------------------
@@ -163,7 +171,7 @@ def date_ui(today: date):
     if "saved_queries" not in st.session_state:
         st.session_state.saved_queries = []
 
-    st.subheader("Date range")
+    # st.subheader("Date range")
 
     picked = st.date_input("Select date range", value=(), key="date_range")
 
@@ -180,11 +188,11 @@ def date_ui(today: date):
         decision = decide_open_meteo_endpoint(start_date, end_date, today=today)
         if decision["ok"]:
             st.session_state.current_decision = decision
-            st.caption(f"Will use: **{decision['mode']}**")
+            # st.caption(f"Will use: **{decision['mode']}**")
         else:
             st.error(decision["error"])
 
-    colA, colB = st.columns([0.25, 0.75])
+    colA, colB = st.columns([0.25, 1.5])
     with colA:
         if st.button("Add Date", disabled=(st.session_state.current_decision is None)):
             decision = dict(st.session_state.current_decision)  # copy
@@ -196,6 +204,14 @@ def date_ui(today: date):
         if st.button("Clear all", disabled=(len(st.session_state.saved_queries) == 0)):
             st.session_state.saved_queries = []
             st.rerun()
+
+    
+
+
+    
+
+
+
 
     if st.session_state.saved_queries:
         st.subheader("Saved date queries")
@@ -231,8 +247,10 @@ st.divider()
 
 
 st.subheader("Export settings")
-base_name_raw = st.text_input("Output file name", value="")
+base_name_raw = st.text_input("Output zipfile name", value="")
 base_name = sanitize_filename(base_name_raw)
+
+
 
 
 if st.button("Fetch weather"):
@@ -283,42 +301,58 @@ if st.button("Fetch weather"):
 
             df_q = hourly_all[hourly_all["query_id"] == qid].copy()
             df_q, tcol = ensure_sorted_hourly(df_q)
+           
             
             # FULL
+            
+            # print("tcol is: ", tcol, df_q.columns)
+            # print("type of date column is: ", df_q[tcol].dtype)
+            df_q = df_q.rename(columns={tcol: 'date'})
+            # print("tcol after renaming is: ", tcol, df_q.columns)
+
+
+            df_q["date"] = df_q["date"]
+            raw_filtered = df_q.copy()
+            # print(raw_filtered["time"])
+
+            
+
+            # FILTERED
+            raw_filtered = make_filtered_sorted(raw_filtered)
+
 
             time_key = ""
-            if "time" in df_q.columns:
+            if "time" in raw_filtered.columns:
                 time_key = "time"
-            elif "date" in df_q.columns:
+            elif "date" in raw_filtered.columns:
                 time_key = "date"
 
-            df_q["date"] = df_q[time_key].dt.strftime("%Y-%m-%d %H:%M")
+
+            print("this is df_Q")
+            print(df_q.head(10))
+            print("this is raw_filtered")
+            print(raw_filtered.head(10))
+            
+            df_q["date"] = df_q["date"].dt.strftime("%Y-%m-%d %H:%M")
+            raw_filtered["date"] = raw_filtered["date"].dt.strftime("%Y-%m-%d %H:%M")
+
+            
+
 
             zf.writestr(
                 f"{label}_full-data.csv",
                 df_q.to_csv(index=False)
             )
 
-            # FILTERED
-            filtered = make_filtered_sorted(df_q)
-
-            filtered = filtered[
-
-                (filtered[tcol].dt.time >= time(8, 0)) &
-                (filtered[tcol].dt.time <= time(19, 0)) &
-                (filtered["cloud_cover_low"] < 50) &
-                (filtered["is_day"] == 1)
-            ]
-            
-            del filtered["query_id"]
-            del filtered["source"]
-            del filtered["is_day"]
-
+            del raw_filtered["query_id"]
+            del raw_filtered["source"]
+            del raw_filtered["is_day"]
 
             zf.writestr(
                 f"{label}_filtered-data.csv",
-                filtered.to_csv(index=False)
+                raw_filtered.to_csv(index=False)
             )
+
 
             # SIM_PARAMETER_FULL_DATA
 
@@ -337,7 +371,7 @@ if st.button("Fetch weather"):
             elif "date" in df_q.columns:
                 time_key = "date"
 
-            df_q2["date"] = df_q[time_key].dt.strftime("%Y-%m-%d %H:%M")
+            df_q2["date"] = df_q[time_key]#.dt.strftime("%Y-%m-%d %H:%M")
             df_q2["temperature"] = df_q[hourly_vars[hourly_vars.index("temperature_2m")]]
             df_q2["pressure"] = df_q[hourly_vars[hourly_vars.index("pressure_msl")]]
 
@@ -345,8 +379,6 @@ if st.button("Fetch weather"):
             csv_size = len(df_q[time_key])
 
             for altitude, wind_speed, wind_direction in zip(altitudes, wind_speeds, wind_directions):
-                # print("This is altitude, windspeed, winddirection")
-                # print(altitude, wind_speed, wind_direction)
                 df_q2[f"{altitude}"] = df_q[wind_speed]
                 df_q2[f"stdev [{altitude}]"] = np.zeros(csv_size)
                 df_q2[f"direction [{altitude}]"] = df_q[wind_direction]
@@ -361,18 +393,15 @@ if st.button("Fetch weather"):
             )
 
 
-            # SIM_PARAMETER_FULL_DATA_FILTERED
+
+
+            # SIM_PARAMETER_FILTERED_DATA
 
 
             sim_filtered = make_filtered_sorted(df_q2)
 
-            sim_filtered = sim_filtered[
-
-                (sim_filtered["date"].dt.time >= time(8, 0)) &
-                (sim_filtered["date"].dt.time <= time(19, 0)) &
-                (sim_filtered["cloud_cover_low"] < 50) &
-                (sim_filtered["is_day"] == 1)
-            ]
+            del sim_filtered["cloud_cover_low"]
+            del sim_filtered["is_day"]
             
 
             zf.writestr(
@@ -383,6 +412,8 @@ if st.button("Fetch weather"):
 
             last_sim_parameters = df_q2.copy()
             last_sim_parameters_filtered = sim_filtered.copy()
+
+            
 
             last_sim_parameters_filtered["date"] = (
                 last_sim_parameters_filtered["date"]
@@ -401,15 +432,16 @@ if st.button("Fetch weather"):
         mime="application/zip",
     )
 
-    st.subheader("Filtered preview (last query)")
+    
     last_qid = sorted(hourly_all["query_id"].unique())[-1]
     preview_q = hourly_all[hourly_all["query_id"] == last_qid].copy()
     preview_q, _ = ensure_sorted_hourly(preview_q)
     preview_filtered = make_filtered_sorted(preview_q)
 
-
+    
+    st.subheader("Filtered preview (last query)")
     st.dataframe(
-        preview_filtered.head(200), 
+        raw_filtered.head(200), 
         use_container_width=True
     )
 
@@ -427,6 +459,6 @@ if st.button("Fetch weather"):
     )
 
 
-    if "daily" in res and res["daily"] is not None and len(res["daily"]) > 0:
-        st.subheader("Daily (preview)")
-        st.dataframe(res["daily"], use_container_width=True)
+    # if "daily" in res and res["daily"] is not None and len(res["daily"]) > 0:
+    #     st.subheader("Daily (preview)")
+    #     st.dataframe(res["daily"], use_container_width=True)
