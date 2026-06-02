@@ -11,3 +11,6 @@ venv/
 
 # other
 .env
+
+"Processed Weather Data/"
+"Raw Weather Data/"
