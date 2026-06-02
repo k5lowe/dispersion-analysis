@@ -25,10 +25,10 @@ unit_label = st.selectbox(
 )
 
 
-agree = st.checkbox("Do you agree to the terms?")
+round_wind_direction = st.checkbox("Round wind direction")
 
-if agree:
-    st.write("Great! Proceeding to the next step.")
+
+
 
 
 wind_speed_unit = "" if unit_label == "Default (km/h)" else unit_label
@@ -214,24 +214,34 @@ def date_ui(today: date):
 
 
     if st.session_state.saved_queries:
-        st.subheader("Saved date queries")
+        st.subheader(f"Saved date queries ({len(st.session_state.saved_queries)})")
+
         for i, item in enumerate(st.session_state.saved_queries):
-            left, mid, right = st.columns([0.55, 0.30, 0.15])
 
-            with left:
-                st.write(f"{i+1}. {format_query(item)}")
+            with st.container(border=True):
 
-            with mid:
-                # per-query filename label
-                key = f"label_{i}"
-                default_val = item.get("label", f"query_{i+1:02d}")
-                new_label = st.text_input("File name", value=default_val, key=key)
-                item["label"] = sanitize_filename(new_label)  # keep it safe
+                left, mid, right = st.columns([0.55, 0.30, 0.15])
 
-            with right:
-                if st.button("Remove", key=f"rm_{i}"):
-                    st.session_state.saved_queries.pop(i)
-                    st.rerun()
+                with left:
+                    st.write(f"**Query {i+1}**")
+                    st.caption(format_query(item))
+
+                with mid:
+                    key = f"label_{i}"
+                    default_val = item.get("label", f"query_{i+1:02d}")
+                    new_label = st.text_input(
+                        "File name",
+                        value=default_val,
+                        key=key
+                    )
+                    item["label"] = sanitize_filename(new_label)
+
+                with right:
+                    st.write("")
+                    st.write("")
+                    if st.button("Remove", key=f"rm_{i}"):
+                        st.session_state.saved_queries.pop(i)
+                        st.rerun()
 
 
 
@@ -263,6 +273,8 @@ if st.button("Fetch weather"):
     lon = st.session_state.longitude
 
     with st.spinner("Fetching data..."):
+
+
         try:
             res = run_many(
                 lat,
@@ -301,7 +313,17 @@ if st.button("Fetch weather"):
 
             df_q = hourly_all[hourly_all["query_id"] == qid].copy()
             df_q, tcol = ensure_sorted_hourly(df_q)
-           
+
+
+
+
+
+
+            if round_wind_direction:
+                for col in config.WIND_DIRECTIONS:
+                    df_q[col] = df_q[col].round(-1)
+
+          
             
             # FULL
             
