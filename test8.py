@@ -7,13 +7,15 @@ import numpy as np
 from io import BytesIO
 import zipfile
 import config
-from datetime import time
+from datetime import date
 
 
 
 
 default_launch_latitude = 47.965378
 default_launch_longitude = -81.873536
+
+
 
 st.title("Meteo Data to CSV")
 
@@ -25,13 +27,29 @@ unit_label = st.selectbox(
 )
 
 
+wind_speed_unit = "" if unit_label == "Default (km/h)" else unit_label
+
+
+
+
 round_wind_direction = st.checkbox("Round wind direction")
 
 
+st.markdown(
+    """
+    <p style="font-size:14px;"> 
+        <em>
+            Note: Checking this box rounds the wind direction for all queries to the nearest 10 degrees
+        </em>
+    </p>
+    """, 
+    unsafe_allow_html=True
+)
 
 
+st.space()
 
-wind_speed_unit = "" if unit_label == "Default (km/h)" else unit_label
+
 
 
 DAILY_VARS = ["wind_gusts_10m_mean"]
@@ -70,8 +88,8 @@ def make_filtered_sorted(df_hourly: pd.DataFrame) -> pd.DataFrame:
     """
     Filters:
       - day only (is_day == 1)
-      - between 8am and before 7pm (08:00 <= hour < 19:00)
-      - cloud_cover_low < 50
+      - between 8am and before 7pm (08:00 <= hour <= 19:00)
+      - cloud_cover_low <= 50
     And returns sorted output.
     """
 
@@ -88,7 +106,7 @@ def make_filtered_sorted(df_hourly: pd.DataFrame) -> pd.DataFrame:
 
     df = df[
         (df["is_day"] == 1) &
-        (df["cloud_cover_low"] < 50) &
+        (df["cloud_cover_low"] <= 50) &
         (df[tcol].dt.hour >= 8) &
         (df[tcol].dt.hour <= 19)
     ]
@@ -257,8 +275,16 @@ st.divider()
 
 
 st.subheader("Export settings")
-base_name_raw = st.text_input("Output zipfile name", value="")
-base_name = sanitize_filename(base_name_raw)
+st.markdown(
+    """
+    <p style="font-size:14px;"> 
+        Note: Name of zipfile is "open-meteo-download_{current date}"
+    </p>
+    """, 
+    unsafe_allow_html=True
+)
+# base_name_raw = st.text_input("Output zipfile name", value="")
+# base_name = sanitize_filename(base_name_raw)
 
 
 
@@ -360,6 +386,8 @@ if st.button("Fetch weather"):
 
             
 
+            del df_q["source"]
+            del df_q["query_id"]
 
             zf.writestr(
                 f"{label}_full-data.csv",
@@ -369,6 +397,7 @@ if st.button("Fetch weather"):
             del raw_filtered["query_id"]
             del raw_filtered["source"]
             del raw_filtered["is_day"]
+            del raw_filtered["cloud_cover_low"]
 
             zf.writestr(
                 f"{label}_filtered-data.csv",
@@ -450,7 +479,7 @@ if st.button("Fetch weather"):
     st.download_button(
         "Download all files (ZIP)",
         data=zip_buffer.getvalue(),
-        file_name=f"{base_name}.zip",
+        file_name=f"open-meteo-download_{today}.zip",
         mime="application/zip",
     )
 
@@ -461,18 +490,12 @@ if st.button("Fetch weather"):
     preview_filtered = make_filtered_sorted(preview_q)
 
     
-    st.subheader("Filtered preview (last query)")
+    st.subheader("Raw Filtered Preview (last query)")
     st.dataframe(
         raw_filtered.head(200), 
         use_container_width=True
     )
 
-
-    st.subheader("Sim Parameters Preview (last query)")
-    st.dataframe(
-        last_sim_parameters.head(200),
-        use_container_width=True
-    )
 
     st.subheader("Sim Parameters Filtered Preview (last query)")
     st.dataframe(
@@ -480,7 +503,11 @@ if st.button("Fetch weather"):
         use_container_width=True
     )
 
-
-    # if "daily" in res and res["daily"] is not None and len(res["daily"]) > 0:
-    #     st.subheader("Daily (preview)")
-    #     st.dataframe(res["daily"], use_container_width=True)
+    st.markdown(
+    """
+    <p style="font-size:14px;"> 
+        Note: Displaying two (filtered) of the four files (raw + filtered)
+    </p>
+    """, 
+    unsafe_allow_html=True
+    )
